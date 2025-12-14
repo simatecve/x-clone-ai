@@ -1,17 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Image, Smile, Calendar, MapPin, Sparkles, X, Loader2 } from 'lucide-react';
+import { Image, Smile, Calendar, MapPin, Sparkles, Loader2 } from 'lucide-react';
 import { enhanceTweet } from '../services/geminiService';
+import { supabase } from '../integrations/supabase/client';
+import { User } from '../types';
 
 interface ComposerProps {
-  onTweet: (content: string, image?: string) => void;
+  onTweetPosted: () => void;
 }
 
-const Composer: React.FC<ComposerProps> = ({ onTweet }) => {
+const Composer: React.FC<ComposerProps> = ({ onTweetPosted }) => {
   const [content, setContent] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [showAiMenu, setShowAiMenu] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    // Get current user for avatar
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        if (data) setCurrentUser(data as User);
+      }
+    };
+    getUser();
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -35,11 +51,26 @@ const Composer: React.FC<ComposerProps> = ({ onTweet }) => {
     }
   };
 
-  const handleSubmit = () => {
-    if (content.trim()) {
-      onTweet(content);
+  const handleSubmit = async () => {
+    if (!content.trim() || !currentUser) return;
+    
+    setIsPosting(true);
+    try {
+      const { error } = await supabase.from('tweets').insert({
+        user_id: currentUser.id,
+        content: content.trim(),
+      });
+
+      if (error) throw error;
+
       setContent('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      onTweetPosted();
+    } catch (error) {
+      console.error('Error posting tweet:', error);
+      alert('Failed to post tweet');
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -47,7 +78,7 @@ const Composer: React.FC<ComposerProps> = ({ onTweet }) => {
     <div className="border-b border-x-border p-4 bg-black">
       <div className="flex space-x-4">
         <img
-          src="https://picsum.photos/100/100?random=user"
+          src={currentUser?.avatar_url || "https://picsum.photos/100/100?random=default"}
           alt="Current User"
           className="h-10 w-10 rounded-full object-cover"
         />
@@ -66,6 +97,7 @@ const Composer: React.FC<ComposerProps> = ({ onTweet }) => {
               placeholder="What is happening?!"
               className="w-full bg-transparent text-xl text-white placeholder-x-gray outline-none resize-none min-h-[50px] overflow-hidden"
               rows={1}
+              disabled={isPosting}
             />
             {isEnhancing && (
               <div className="absolute top-0 right-0 p-2">
@@ -116,13 +148,14 @@ const Composer: React.FC<ComposerProps> = ({ onTweet }) => {
 
             <button
               onClick={handleSubmit}
-              disabled={!content.trim() || isEnhancing}
-              className={`rounded-full px-5 py-1.5 font-bold text-sm transition-all ${
-                content.trim() && !isEnhancing
+              disabled={!content.trim() || isEnhancing || isPosting}
+              className={`rounded-full px-5 py-1.5 font-bold text-sm transition-all flex items-center ${
+                content.trim() && !isEnhancing && !isPosting
                   ? 'bg-x-blue hover:bg-x-blueHover text-white'
                   : 'bg-x-blue/50 text-white/50 cursor-not-allowed'
               }`}
             >
+              {isPosting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Post
             </button>
           </div>

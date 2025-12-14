@@ -1,99 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Tweet from './Tweet';
 import Composer from './Composer';
 import { TweetData, TweetFilter } from '../types';
-import { Settings } from 'lucide-react';
-
-const INITIAL_TWEETS: TweetData[] = [
-  {
-    id: '1',
-    user: {
-      id: 'google_devs',
-      name: 'Google for Developers',
-      handle: 'googledevs',
-      avatarUrl: 'https://picsum.photos/100/100?random=1',
-      verified: true,
-    },
-    content: 'Building with the Gemini API is just different. The speed and context window allow for some truly next-gen apps. 🚀 #Gemini #AI',
-    timestamp: '2h',
-    likes: 1240,
-    retweets: 350,
-    replies: 42,
-    views: '85K',
-    liked: false,
-    retweeted: false,
-    image: 'https://picsum.photos/600/300?random=tech'
-  },
-  {
-    id: '2',
-    user: {
-      id: 'react_fan',
-      name: 'React Enthusiast',
-      handle: 'reactjs_fan',
-      avatarUrl: 'https://picsum.photos/100/100?random=2',
-    },
-    content: 'Just migrated my whole codebase to TypeScript. Best decision ever? Or am I in for a world of pain with generic types? 😅',
-    timestamp: '4h',
-    likes: 856,
-    retweets: 24,
-    replies: 128,
-    views: '12K',
-    liked: true,
-    retweeted: false,
-  },
-  {
-    id: '3',
-    user: {
-      id: 'elon_clone',
-      name: 'Tech Mogul',
-      handle: 'techking',
-      avatarUrl: 'https://picsum.photos/100/100?random=3',
-      verified: true
-    },
-    content: 'Mars looks nice this time of year.',
-    timestamp: '5h',
-    likes: 54000,
-    retweets: 12000,
-    replies: 4500,
-    views: '1.2M',
-    liked: false,
-    retweeted: true,
-  }
-];
+import { Settings, Loader2 } from 'lucide-react';
+import { supabase } from '../integrations/supabase/client';
 
 const Feed: React.FC = () => {
-  const [tweets, setTweets] = useState<TweetData[]>(INITIAL_TWEETS);
+  const [tweets, setTweets] = useState<TweetData[]>([]);
   const [activeFilter, setActiveFilter] = useState<TweetFilter>(TweetFilter.FOR_YOU);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTweets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tweets')
+        .select(`
+          *,
+          profiles:user_id (
+            id,
+            username,
+            full_name,
+            avatar_url,
+            verified
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+      
+      setTweets(data as unknown as TweetData[]);
+    } catch (error) {
+      console.error('Error fetching tweets:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    fetchTweets();
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 0);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const handleNewTweet = (content: string) => {
-    const newTweet: TweetData = {
-      id: Date.now().toString(),
-      user: {
-        id: 'current_user',
-        name: 'Demo User',
-        handle: 'demouser',
-        avatarUrl: 'https://picsum.photos/100/100?random=user',
-      },
-      content: content,
-      timestamp: 'Just now',
-      likes: 0,
-      retweets: 0,
-      replies: 0,
-      views: '1',
-      liked: false,
-      retweeted: false,
-    };
-    setTweets([newTweet, ...tweets]);
-  };
+  }, [fetchTweets]);
 
   return (
     <div className="border-x border-x-border min-h-screen max-w-[600px] w-full">
@@ -126,16 +81,26 @@ const Feed: React.FC = () => {
         </div>
       </div>
 
-      <Composer onTweet={handleNewTweet} />
+      <Composer onTweetPosted={fetchTweets} />
 
       {/* Tweets */}
       <div>
-        {tweets.map(tweet => (
-          <Tweet key={tweet.id} tweet={tweet} />
-        ))}
-        <div className="p-10 text-center text-x-blue text-sm cursor-pointer hover:bg-white/5 transition-colors border-b border-x-border">
-          Show 346 Tweets
-        </div>
+        {loading ? (
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-8 w-8 text-x-blue animate-spin" />
+          </div>
+        ) : (
+          <>
+            {tweets.map(tweet => (
+              <Tweet key={tweet.id} tweet={tweet} />
+            ))}
+            {tweets.length === 0 && (
+               <div className="p-10 text-center text-x-gray">
+                 No tweets yet. Be the first to post!
+               </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

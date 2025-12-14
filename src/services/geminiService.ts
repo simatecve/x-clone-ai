@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error("API_KEY is missing in environment variables.");
     return null;
@@ -19,7 +19,7 @@ export const enhanceTweet = async (currentText: string, tone: 'professional' | '
     Original text: "${currentText}"`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents: prompt,
     });
 
@@ -38,7 +38,7 @@ export const generateTweetTopic = async (topic: string): Promise<string> => {
     const prompt = `Write a creative and engaging social media post about ${topic}. Use an emoji. Keep it concise.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents: prompt,
     });
 
