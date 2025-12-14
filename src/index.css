@@ -1,0 +1,16 @@
+body {
+  background-color: #000000;
+  color: #e7e9ea;
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Custom Scrollbar for Sidebar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
